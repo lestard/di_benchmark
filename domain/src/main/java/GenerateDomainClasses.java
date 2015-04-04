@@ -10,10 +10,12 @@ public class GenerateDomainClasses {
 
     public static final int NUMBER_OF_CLASSES_IN_EACH_CATEGORY = 10;
 
-    public static final String PACKAGE_LEAFS = "leafs";
-    public static final String PACKAGE_SINGLE_DEPENDENCY= "singledep";
-    public static final String PACKAGE_INTERFACES = "interfaces";
-    public static final String PACKAGE_TWO_DEPS = "twodeps";
+    public static final String PACKAGE_ROOT = "domain.generated.";
+
+    public static final String PACKAGE_LEAFS = PACKAGE_ROOT + "leafs";
+    public static final String PACKAGE_SINGLE_DEPENDENCY= PACKAGE_ROOT + "singledep";
+    public static final String PACKAGE_INTERFACES = PACKAGE_ROOT + "interfaces";
+    public static final String PACKAGE_TWO_DEPS =  PACKAGE_ROOT + "twodeps";
 
     private List<JDefinedClass> leafs = new ArrayList<>();
     private List<JDefinedClass> interfaces = new ArrayList<>();
@@ -38,7 +40,7 @@ public class GenerateDomainClasses {
         createTwoDependencyClasses(codeModel);
 
 
-        File file = new File("domain/build/_classes");
+        File file = new File("domain/src/main/java/");
         file.mkdirs();
 
         System.out.println(">" + file.getAbsolutePath());
@@ -65,14 +67,8 @@ public class GenerateDomainClasses {
             final JMethod constructor = aClass.constructor(JMod.PUBLIC);
             constructor.annotate(Inject.class);
 
-
-            final JFieldVar field1 = aClass.field(JMod.PRIVATE, leafs.get(i), "leaf");
-            final JVar param1 = constructor.param(leafs.get(i), "_leaf");
-            constructor.body().assign(field1, param1);
-
-            final JFieldVar field2 = aClass.field(JMod.PRIVATE, interfaces.get(i), "inter");
-            final JVar param2 = constructor.param(interfaces.get(i), "_inter");
-            constructor.body().assign(field2, param2);
+            createField(aClass, constructor, leafs.get(i), "Leaf");
+            createField(aClass, constructor, interfaces.get(i), "Inter");
 
             if(i % 8 == 0) {
                 aClass.annotate(Singleton.class);
@@ -89,18 +85,25 @@ public class GenerateDomainClasses {
         }
     }
 
+    private void createField(JDefinedClass aClass, JMethod constructor, JDefinedClass leafType, String fieldName) {
+        final JFieldVar field1 = aClass.field(JMod.PRIVATE, leafType, fieldName.toLowerCase());
+        final JVar param1 = constructor.param(leafType, "_" + fieldName.toLowerCase());
+        constructor.body().assign(field1, param1);
+
+        final JMethod getter = aClass.method(JMod.PUBLIC, leafType, "get" + fieldName);
+        getter.body()._return(field1);
+    }
+
 
     private void createSingleDependencyClasses(JCodeModel codeModel) throws Exception {
         final JPackage pack = codeModel._package(PACKAGE_SINGLE_DEPENDENCY);
 
         for(int i=0 ; i< NUMBER_OF_CLASSES_IN_EACH_CATEGORY ; i++){
             final JDefinedClass aClass = pack._class("SingleDep" + i);
-            final JFieldVar field = aClass.field(JMod.PRIVATE, leafs.get(i), "leaf");
-
             final JMethod constructor = aClass.constructor(JMod.PUBLIC);
             constructor.annotate(Inject.class);
-            final JVar param = constructor.param(leafs.get(i), "_leaf");
-            constructor.body().assign(field, param);
+
+            createField(aClass, constructor, leafs.get(i), "Leaf");
 
             // every third class will be a singleton
             if(i % 3 == 0) {
