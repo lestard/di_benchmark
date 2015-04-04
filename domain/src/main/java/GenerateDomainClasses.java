@@ -12,10 +12,14 @@ public class GenerateDomainClasses {
 
     public static final String PACKAGE_LEAFS = "leafs";
     public static final String PACKAGE_SINGLE_DEPENDENCY= "singledep";
+    public static final String PACKAGE_INTERFACES = "interfaces";
     public static final String PACKAGE_TWO_DEPS = "twodeps";
 
     private List<JDefinedClass> leafs = new ArrayList<>();
+    private List<JDefinedClass> interfaces = new ArrayList<>();
     private List<JDefinedClass> singleDeps = new ArrayList<>();
+    private List<JDefinedClass> twoDeps = new ArrayList<>();
+
 
 
 	public static void main(String[] args) throws Exception{
@@ -25,11 +29,13 @@ public class GenerateDomainClasses {
     private void createWithCodeModel() throws Exception {
         JCodeModel codeModel = new JCodeModel();
 
+        createInterfaces(codeModel);
 
         createLeafClasses(codeModel);
 
         createSingleDependencyClasses(codeModel);
 
+        createTwoDependencyClasses(codeModel);
 
 
         File file = new File("domain/build/_classes");
@@ -40,10 +46,47 @@ public class GenerateDomainClasses {
         codeModel.build(file);
     }
 
+    private void createInterfaces(JCodeModel codeModel) throws Exception {
+        final JPackage pack = codeModel._package(PACKAGE_INTERFACES);
+
+        for(int i=0 ; i<NUMBER_OF_CLASSES_IN_EACH_CATEGORY ; i++){
+            final JDefinedClass anInterface = pack._interface("Interface" + i);
+
+            interfaces.add(anInterface);
+        }
+    }
+
 
     private void createTwoDependencyClasses(JCodeModel codeModel) throws Exception {
+        final JPackage pack = codeModel._package(PACKAGE_TWO_DEPS);
 
-        
+        for(int i=0 ; i< NUMBER_OF_CLASSES_IN_EACH_CATEGORY ; i++){
+            final JDefinedClass aClass = pack._class("TwoDep" + i);
+            final JMethod constructor = aClass.constructor(JMod.PUBLIC);
+            constructor.annotate(Inject.class);
+
+
+            final JFieldVar field1 = aClass.field(JMod.PRIVATE, leafs.get(i), "leaf");
+            final JVar param1 = constructor.param(leafs.get(i), "_leaf");
+            constructor.body().assign(field1, param1);
+
+            final JFieldVar field2 = aClass.field(JMod.PRIVATE, interfaces.get(i), "inter");
+            final JVar param2 = constructor.param(interfaces.get(i), "_inter");
+            constructor.body().assign(field2, param2);
+
+            if(i % 8 == 0) {
+                aClass.annotate(Singleton.class);
+            }
+
+
+            if(i % 13 == 0) {
+                final JDefinedClass anInterface = interfaces.get(i);
+
+                aClass._implements(anInterface);
+            }
+
+            twoDeps.add(aClass);
+        }
     }
 
 
@@ -64,6 +107,13 @@ public class GenerateDomainClasses {
                 aClass.annotate(Singleton.class);
             }
 
+
+            if(i % 4 == 0) {
+                final JDefinedClass anInterface = interfaces.get(i);
+
+                aClass._implements(anInterface);
+            }
+
             singleDeps.add(aClass);
         }
     }
@@ -79,6 +129,12 @@ public class GenerateDomainClasses {
             // every third class will be a singleton
             if(i % 3 == 0) {
                 aClass.annotate(Singleton.class);
+            }
+
+            if(i % 7 == 0) {
+                final JDefinedClass anInterface = interfaces.get(i);
+
+                aClass._implements(anInterface);
             }
 
 
