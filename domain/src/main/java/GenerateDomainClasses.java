@@ -10,17 +10,20 @@ public class GenerateDomainClasses {
 
     public static final int NUMBER_OF_CLASSES_IN_EACH_CATEGORY = 10;
 
-    public static final String PACKAGE_ROOT = "domain.generated.";
+    public static final String PACKAGE_ROOT = "domain.generated";
 
-    public static final String PACKAGE_LEAFS = PACKAGE_ROOT + "leafs";
-    public static final String PACKAGE_SINGLE_DEPENDENCY= PACKAGE_ROOT + "singledep";
-    public static final String PACKAGE_INTERFACES = PACKAGE_ROOT + "interfaces";
-    public static final String PACKAGE_TWO_DEPS =  PACKAGE_ROOT + "twodeps";
+    public static final String PACKAGE_LEAFS = PACKAGE_ROOT + ".leafs";
+    public static final String PACKAGE_SINGLE_DEPENDENCY= PACKAGE_ROOT + ".singledep";
+    public static final String PACKAGE_INTERFACES = PACKAGE_ROOT + ".interfaces";
+    public static final String PACKAGE_TWO_DEPS =  PACKAGE_ROOT + ".twodeps";
+    public static final String PACKAGE_AGGREGATOR =  PACKAGE_ROOT + ".aggregator";
+
 
     private List<JDefinedClass> leafs = new ArrayList<>();
     private List<JDefinedClass> interfaces = new ArrayList<>();
     private List<JDefinedClass> singleDeps = new ArrayList<>();
     private List<JDefinedClass> twoDeps = new ArrayList<>();
+    private List<JDefinedClass> aggregators = new ArrayList<>();
 
 
 
@@ -39,6 +42,11 @@ public class GenerateDomainClasses {
 
         createTwoDependencyClasses(codeModel);
 
+        createAggregators(codeModel);
+
+
+        createRoot(codeModel);
+
 
         File file = new File("domain/src/main/java/");
         file.mkdirs();
@@ -46,6 +54,77 @@ public class GenerateDomainClasses {
         System.out.println(">" + file.getAbsolutePath());
 
         codeModel.build(file);
+    }
+
+    private void createRoot(JCodeModel codeModel) throws Exception {
+        final JPackage pack = codeModel._package(PACKAGE_ROOT);
+
+        final JDefinedClass root = pack._class("Root");
+        final JMethod constructor = root.constructor(JMod.PUBLIC);
+        constructor.annotate(Inject.class);
+
+        createField(root, constructor, aggregators.get(aggregators.size()-1), "lastAggregator");
+
+    }
+
+    private void createAggregators(JCodeModel codeModel) throws Exception{
+        final JPackage pack = codeModel._package(PACKAGE_AGGREGATOR);
+
+        List<JDefinedClass> firstLevelAggregators = new ArrayList<>();
+
+        for(int i=0 ; i<NUMBER_OF_CLASSES_IN_EACH_CATEGORY ; i++){
+            final JDefinedClass aClass = pack._class("Aggregator" + i);
+            final JMethod constructor = aClass.constructor(JMod.PUBLIC);
+            constructor.annotate(Inject.class);
+
+            createField(aClass, constructor, leafs.get(i), "Leaf");
+            createField(aClass, constructor, interfaces.get(i), "Inter");
+            createField(aClass, constructor, singleDeps.get(i), "SingleDep");
+            createField(aClass, constructor, twoDeps.get(i), "TwoDep");
+
+            firstLevelAggregators.add(aClass);
+        }
+
+        aggregators.addAll(firstLevelAggregators);
+
+        _aggregate(firstLevelAggregators, pack, 0);
+    }
+
+    private void _aggregate(List<JDefinedClass> rest, JPackage pack, int lastIndex) throws Exception {
+        int subAggregatorIndex = 0;
+
+        List<JDefinedClass> subAggregators = new ArrayList<>();
+
+        List<JDefinedClass> tmp = new ArrayList<>(rest);
+
+        JDefinedClass lastSubAggregator;
+
+        while(!tmp.isEmpty()) {
+            final int i = Math.min(5, tmp.size());
+            final List<JDefinedClass> sublist = tmp.subList(0, i);
+
+
+            final JDefinedClass aClass = pack._class("SubAggregator" + lastIndex + "_" + subAggregatorIndex);
+            lastSubAggregator = aClass;
+            subAggregatorIndex++;
+
+            final JMethod constructor = aClass.constructor(JMod.PUBLIC);
+            constructor.annotate(Inject.class);
+
+            for (int j = 0; j < sublist.size(); j++) {
+                JDefinedClass definedClass = sublist.get(j);
+                createField(aClass, constructor, definedClass, "Aggregator" + j);
+            }
+            aggregators.add(aClass);
+
+            subAggregators.add(aClass);
+
+            tmp.removeAll(sublist);
+        }
+
+        if(subAggregators.size() > 1) {
+            _aggregate(subAggregators, pack, lastIndex + 1);
+        }
     }
 
     private void createInterfaces(JCodeModel codeModel) throws Exception {
